@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-SAVE_INTERVAL = 15
+SAVE_INTERVAL = 5
 STATE_DIR = Path.home() / ".mempalace" / "hook_state"
 PALACE_ROOT = Path.home() / ".mempalace"
 
@@ -754,6 +754,10 @@ def hook_stop(data: dict, harness: str):
 
     _log(f"Session {session_id}: {exchange_count} exchanges, {since_last} since last save")
 
+    # Always ingest transcript on every Stop so short sessions are never lost
+    if transcript_path:
+        _ingest_transcript(transcript_path)
+
     if since_last >= SAVE_INTERVAL and exchange_count > 0:
         _log(f"TRIGGERING SAVE at exchange {exchange_count}")
 
@@ -777,7 +781,6 @@ def hook_stop(data: dict, harness: str):
                 result = _save_diary_direct(
                     transcript_path, session_id, wing=project_wing, toast=toast
                 )
-                _ingest_transcript(transcript_path)
             _maybe_auto_ingest()
             # Only advance save marker after successful save
             count = result.get("count", 0)
@@ -806,8 +809,6 @@ def hook_stop(data: dict, harness: str):
                 last_save_file.write_text(str(exchange_count), encoding="utf-8")
             except OSError:
                 pass
-            if transcript_path:
-                _ingest_transcript(transcript_path)
             _maybe_auto_ingest()
             reason = STOP_BLOCK_REASON + f" Write diary entry to wing={project_wing}."
             _output({"decision": "block", "reason": reason})
